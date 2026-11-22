@@ -3,7 +3,7 @@ using Xunit;
 
 namespace OpenDevelop.IntegrationTests;
 
-[Collection("30 Add-ins and specialized fixtures")]
+[Collection(MewUIDesigner.IntegrationTests.OpenDevelopInstalledAppCollection.Name)]
 public sealed class MewUIDesignerTests : IAsyncLifetime, IAsyncDisposable
 {
 	readonly OpenDevelopAppFixture app;
