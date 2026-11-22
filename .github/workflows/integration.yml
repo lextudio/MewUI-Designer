@@ -27,19 +27,10 @@ jobs:
           echo "Latest stable OpenDevelop: $tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-  build:
-    name: Build add-in (${{ matrix.name }})
+  build-addin:
+    name: Build add-in (AnyCPU)
     needs: resolve-version
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { name: windows-x64,   os: windows-latest,   asset: OpenDevelop-win.7z }
-          - { name: windows-arm64, os: windows-11-arm,   asset: OpenDevelop-win.7z }
-          - { name: linux-x64,     os: ubuntu-latest,    asset: OpenDevelop-linux-x64.tar.xz }
-          - { name: linux-arm64,   os: ubuntu-24.04-arm, asset: OpenDevelop-linux-arm64.tar.xz }
-          - { name: macos-arm64,   os: macos-latest,     asset: OpenDevelop-macos.dmg }
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,22 +51,66 @@ jobs:
           set -e
           export MROOT="${{ github.workspace }}/MewUI-Designer"
           export OROOT="${{ github.workspace }}/OpenDevelop"
-          export OPENDEVELOP_ROOT="$OROOT/"
           CFG="$MROOT/.github/ci/NuGet.Config"
           cd "$MROOT"
-          for proj in \
-            src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj \
-            src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj \
-            src/Tools/MewUIGen/MewUIGen.csproj \
-            tests/fixtures/MewUIFixture/MewUIFixture.csproj \
-            src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj ; do
-            dotnet restore "$proj" --configfile "$CFG"
-            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:EnableWindowsTargeting=true
-          done
+          dotnet restore src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj --configfile "$CFG"
+          dotnet build src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OROOT/" -p:EnableWindowsTargeting=true
+      - name: Upload add-in
+        uses: actions/upload-artifact@v4
+        with:
+          name: mewui-addin
+          path: |
+            OpenDevelop/AddIns/DisplayBindings/MewUIDesigner/**
+            !OpenDevelop/AddIns/DisplayBindings/MewUIDesigner/Host/**
+          if-no-files-found: error
+
+  build-host:
+    name: Build host (${{ matrix.name }})
+    needs: resolve-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows-x64,   os: windows-latest }
+          - { name: windows-arm64, os: windows-11-arm }
+          - { name: linux-x64,     os: ubuntu-latest }
+          - { name: linux-arm64,   os: ubuntu-24.04-arm }
+          - { name: macos-arm64,   os: macos-latest }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: MewUI-Designer
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: lextudio/OpenDevelop
+          ref: ${{ needs.resolve-version.outputs.tag }}
+          path: OpenDevelop
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+      - name: Build
+        shell: bash
+        run: |
+          set -e
+          export MROOT="${{ github.workspace }}/MewUI-Designer"
+          export OROOT="${{ github.workspace }}/OpenDevelop"
+          CFG="$MROOT/.github/ci/NuGet.Config"
+          cd "$MROOT"
+          dotnet restore src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj --configfile "$CFG"
+          dotnet build src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OROOT/" -p:EnableWindowsTargeting=true
+      - name: Upload host
+        uses: actions/upload-artifact@v4
+        with:
+          name: mewui-host-${{ matrix.name }}
+          path: OpenDevelop/AddIns/DisplayBindings/MewUIDesigner/Host/**
+          if-no-files-found: error
 
   integration:
     name: DevFlow integration (${{ matrix.name }})
-    needs: [resolve-version, build]
+    needs: [resolve-version, build-addin, build-host]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -100,6 +135,17 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '11.0.x'
+
+      - name: Download add-in and host
+        uses: actions/download-artifact@v4
+        with:
+          name: mewui-addin
+          path: ${{ runner.temp }}/addin
+      - name: Download host
+        uses: actions/download-artifact@v4
+        with:
+          name: mewui-host-${{ matrix.name }}
+          path: ${{ runner.temp }}/addin/Host
 
       - name: Install Linux display dependencies
         if: runner.os == 'Linux'
@@ -142,41 +188,29 @@ jobs:
           fi
           echo "OPENDEVELOP_APP_PATH=$app" >> "$GITHUB_ENV"
 
-      - name: Build add-in
+      - name: Build integration tests
         shell: bash
         run: |
           set -e
           export MROOT="${{ github.workspace }}/MewUI-Designer"
           export OROOT="${{ github.workspace }}/OpenDevelop"
-          export OPENDEVELOP_ROOT="$OROOT/"
           CFG="$MROOT/.github/ci/NuGet.Config"
           cd "$MROOT"
-          for proj in \
-            src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj \
-            src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj \
-            src/Tools/MewUIGen/MewUIGen.csproj \
-            tests/fixtures/MewUIFixture/MewUIFixture.csproj \
-            src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj ; do
-            dotnet restore "$proj" --configfile "$CFG"
-            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:EnableWindowsTargeting=true
-          done
+          dotnet restore src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj --configfile "$CFG"
+          dotnet build src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OROOT/" -p:EnableWindowsTargeting=true
 
       - name: Install add-in into stable OpenDevelop
         shell: bash
         run: |
           set -e
-          export OROOT="${{ github.workspace }}/OpenDevelop"
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             ADDINS="${{ runner.temp }}/od/OpenDevelop.app/Contents/MacOS/AddIns"
           else
             ADDINS="$(dirname "$OPENDEVELOP_APP_PATH")/AddIns"
           fi
-          SRC_ADDINS="$OROOT/AddIns/DisplayBindings/MewUIDesigner"
           rm -rf "$ADDINS/DisplayBindings/MewUIDesigner"
           mkdir -p "$ADDINS/DisplayBindings/MewUIDesigner"
-          if [[ -d "$SRC_ADDINS" ]]; then
-            cp -R "$SRC_ADDINS/"* "$ADDINS/DisplayBindings/MewUIDesigner/"
-          fi
+          cp -R "${{ runner.temp }}/addin/"* "$ADDINS/DisplayBindings/MewUIDesigner/"
 
       - name: Run integration tests
         shell: bash
@@ -184,12 +218,11 @@ jobs:
           set -e
           export MROOT="${{ github.workspace }}/MewUI-Designer"
           export OROOT="${{ github.workspace }}/OpenDevelop"
-          export OPENDEVELOP_ROOT="$OROOT/"
           cd "$MROOT/src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests"
           if [[ "${{ runner.os }}" == "Linux" ]]; then
-            xvfb-run --auto-servernum dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -- \
+            xvfb-run --auto-servernum dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OROOT/" -- \
               -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
           else
-            dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -- \
+            dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OROOT/" -- \
               -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
           fi
