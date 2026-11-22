@@ -79,10 +79,16 @@ public static class MewUIDesignerDevFlowActions
 			.FirstOrDefault(candidate => candidate.Name == MewUIItemsCollectionEditor.EditButtonName);
 		if (button == null || !button.IsEnabled)
 			return DesignerDevFlowResults.Failure("Properties pad did not render an enabled items editor button: " + propertyName);
-		var result = CollectionItemsEditing.RunScriptedEdit(button, script);
-		return result.Success
-			? JsonSerializer.Serialize(new { success = true, selectedName = view.SelectedName, before = result.Before, after = result.After, committed = result.Committed })
-			: DesignerDevFlowResults.Failure(result.Error ?? "Items edit failed");
+		try {
+			var result = CollectionItemsEditing.RunScriptedEdit(button, script);
+			return result.Success
+				? JsonSerializer.Serialize(new { success = true, selectedName = view.SelectedName, before = result.Before, after = result.After, committed = result.Committed })
+				: DesignerDevFlowResults.Failure(result.Error ?? "Items edit failed");
+		} catch (Exception e) {
+			// A cold or restarting host can fail this call transiently. Returning a failure keeps
+			// the exception off the UI dispatcher, where it would shut the whole IDE down.
+			return DesignerDevFlowResults.Failure("Items edit failed: " + e.GetBaseException().Message);
+		}
 	}
 	[DevFlowAction("od.mewui-designer.clipboard", Description = "Run the design surface's cut|copy|paste|paste-here|duplicate|move-first|move-earlier|move-later|move-last|unwrap|wrap-<Container> command on the selection, as its context menu does")]
 	public static async Task<string> Clipboard(string command)

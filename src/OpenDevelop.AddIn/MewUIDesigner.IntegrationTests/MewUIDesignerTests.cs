@@ -558,9 +558,21 @@ public sealed class MewUIDesignerTests : IAsyncLifetime, IAsyncDisposable
 		await WaitForDesignerAsync();
 		var selected = await app.InvokeAsync("od.mewui-designer.select", "statusList"); Assert.True(selected.GetProperty("success").GetBoolean(), selected.ToString());
 
+		// A cold or restarting MewUI host can refuse the first list-edit call; retry briefly rather
+		// than turn a transient host start into a red lane.
+		async Task<JsonElement> EditItemsAsync(string script) {
+			JsonElement result = default;
+			for (int attempt = 1; attempt <= 5; attempt++) {
+				result = await app.InvokeAsync("od.mewui-designer.properties.edit-items", "$items", script);
+				if (!result.TryGetProperty("success", out var ok) || ok.GetBoolean()) return result;
+				await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+			}
+			return result;
+		}
+
 		// This presses the real Items row's editor button. The script adds two source-owned list
 		// entries then moves the second first; it must travel through the MewUI adapter and host.
-		var edited = await app.InvokeAsync("od.mewui-designer.properties.edit-items", "$items", "add:-1:Ready;add:0:Working;up:1");
+		var edited = await EditItemsAsync("add:-1:Ready;add:0:Working;up:1");
 		Assert.True(edited.GetProperty("success").GetBoolean(), edited.ToString());
 		Assert.True(edited.GetProperty("committed").GetBoolean(), edited.ToString());
 		Assert.Equal(new[] { "Working", "Ready" }, edited.GetProperty("after").EnumerateArray().Select(item => item.GetString()));
@@ -572,10 +584,10 @@ public sealed class MewUIDesignerTests : IAsyncLifetime, IAsyncDisposable
 		Assert.True(System.Text.RegularExpressions.Regex.IsMatch(mxaml, "<ListBox Name=\"statusList\">\\s*<Item>Working</Item>\\s*<Item>Ready</Item>\\s*</ListBox>"),
 			"The saved file does not hold the edited statusList (save " + saved + "):\n" + mxaml);
 		var undone = await app.InvokeAsync("od.mewui-designer.undo"); Assert.True(undone.GetProperty("canRedo").GetBoolean(), undone.ToString());
-		var afterUndo = await app.InvokeAsync("od.mewui-designer.properties.edit-items", "$items", "cancel");
+		var afterUndo = await EditItemsAsync("cancel");
 		Assert.Empty(afterUndo.GetProperty("before").EnumerateArray());
 		var redone = await app.InvokeAsync("od.mewui-designer.redo"); Assert.False(redone.GetProperty("canRedo").GetBoolean(), redone.ToString());
-		var afterRedo = await app.InvokeAsync("od.mewui-designer.properties.edit-items", "$items", "cancel");
+		var afterRedo = await EditItemsAsync("cancel");
 		Assert.Equal(new[] { "Working", "Ready" }, afterRedo.GetProperty("before").EnumerateArray().Select(item => item.GetString()));
 	}
 
