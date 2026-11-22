@@ -1,0 +1,152 @@
+name: MewUI Designer integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NuGetPackageSourceCredentials_lextudio_github: Username=${{ github.actor }};Password=${{ secrets.GITHUB_TOKEN }};ValidAuthenticationTypes=Basic
+
+jobs:
+  resolve-version:
+    name: Resolve latest stable OpenDevelop
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Query latest release
+        id: resolve
+        shell: bash
+        run: |
+          set -e
+          tag=$(curl -fsSL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/lextudio/OpenDevelop/releases/latest \
+            | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')
+          echo "Latest stable OpenDevelop: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build add-in (${{ matrix.os }})
+    needs: resolve-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: MewUI-Designer
+      - uses: actions/checkout@v4
+        with:
+          repository: lextudio/OpenDevelop
+          ref: ${{ needs.resolve-version.outputs.tag }}
+          path: OpenDevelop
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+      - name: Build
+        shell: bash
+        run: |
+          set -e
+          export MROOT="${{ github.workspace }}/MewUI-Designer"
+          export OROOT="${{ github.workspace }}/OpenDevelop"
+          export OPENDEVELOP_ROOT="$OROOT/"
+          cd "$MROOT"
+          dotnet build src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+          dotnet build src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+          dotnet build src/Tools/MewUIGen/MewUIGen.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+          dotnet build tests/fixtures/MewUIFixture/MewUIFixture.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+          dotnet build src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+
+  integration:
+    name: DevFlow integration (${{ matrix.os }})
+    needs: [resolve-version, build]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: MewUI-Designer
+      - uses: actions/checkout@v4
+        with:
+          repository: lextudio/OpenDevelop
+          ref: ${{ needs.resolve-version.outputs.tag }}
+          path: OpenDevelop
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+
+      - name: Download stable OpenDevelop
+        shell: bash
+        env:
+          TAG: ${{ needs.resolve-version.outputs.tag }}
+        run: |
+          set -e
+          mkdir -p "${{ runner.temp }}/od"
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            curl -fL -o "${{ runner.temp }}/od/OpenDevelop.dmg" \
+              "https://github.com/lextudio/OpenDevelop/releases/download/${TAG}/OpenDevelop-macos.dmg"
+            hdiutil attach "${{ runner.temp }}/od/OpenDevelop.dmg" -nobrowse -mountpoint "${{ runner.temp }}/od/mnt"
+            cp -R "${{ runner.temp }}/od/mnt/OpenDevelop.app" "${{ runner.temp }}/od/OpenDevelop.app"
+            hdiutil detach "${{ runner.temp }}/od/mnt"
+          else
+            curl -fL -o "${{ runner.temp }}/od/OpenDevelop.7z" \
+              "https://github.com/lextudio/OpenDevelop/releases/download/${TAG}/OpenDevelop-win.7z"
+            7z x "${{ runner.temp }}/od/OpenDevelop.7z" -o"${{ runner.temp }}/od" -y
+          fi
+
+      - name: Set OpenDevelop app path
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            echo "OPENDEVELOP_APP_PATH=${{ runner.temp }}/od/OpenDevelop.app/Contents/MacOS/OpenDevelop" >> "$GITHUB_ENV"
+          else
+            exe=$(find "${{ runner.temp }}/od" -name "OpenDevelop.exe" | head -1)
+            echo "OPENDEVELOP_APP_PATH=$exe" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build add-in
+        shell: bash
+        run: |
+          set -e
+          export MROOT="${{ github.workspace }}/MewUI-Designer"
+          export OROOT="${{ github.workspace }}/OpenDevelop"
+          export OPENDEVELOP_ROOT="$OROOT/"
+          cd "$MROOT"
+          dotnet build src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+          dotnet build src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+          dotnet build src/Tools/MewUIGen/MewUIGen.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+          dotnet build tests/fixtures/MewUIFixture/MewUIFixture.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+
+      - name: Install add-in into stable OpenDevelop
+        shell: bash
+        run: |
+          set -e
+          export MROOT="${{ github.workspace }}/MewUI-Designer"
+          export OROOT="${{ github.workspace }}/OpenDevelop"
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            ADDINS="${{ runner.temp }}/od/OpenDevelop.app/Contents/MacOS/AddIns"
+          else
+            ADDINS="$(dirname "$OPENDEVELOP_APP_PATH")/AddIns"
+          fi
+          SRC_ADDINS="$OROOT/AddIns/DisplayBindings/MewUIDesigner"
+          rm -rf "$ADDINS/DisplayBindings/MewUIDesigner"
+          mkdir -p "$ADDINS/DisplayBindings/MewUIDesigner"
+          if [[ -d "$SRC_ADDINS" ]]; then
+            cp -R "$SRC_ADDINS/"* "$ADDINS/DisplayBindings/MewUIDesigner/"
+          fi
+
+      - name: Run integration tests
+        shell: bash
+        run: |
+          set -e
+          export MROOT="${{ github.workspace }}/MewUI-Designer"
+          export OROOT="${{ github.workspace }}/OpenDevelop"
+          export OPENDEVELOP_ROOT="$OROOT/"
+          cd "$MROOT/src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests"
+          dotnet run -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true -- \
+            -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none

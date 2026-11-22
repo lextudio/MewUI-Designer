@@ -1,0 +1,53 @@
+﻿<Project Sdk="LibreWPF.Sdk">
+  <PropertyGroup>
+    <!-- OpenDevelop root resolution, matching CoreWF/MAUI external addins. -->
+    <OpenDevelopRoot Condition="'$(OpenDevelopRoot)' == '' And '$(OPENDEVELOP_ROOT)' != ''">$([MSBuild]::EnsureTrailingSlash('$(OPENDEVELOP_ROOT)'))</OpenDevelopRoot>
+    <OpenDevelopRoot Condition="'$(OpenDevelopRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../../../OpenDevelop/'))</OpenDevelopRoot>
+    <OpenDevelopRoot>$([MSBuild]::EnsureTrailingSlash('$(OpenDevelopRoot)'))</OpenDevelopRoot>
+    <OpenDevelopHostBin Condition="'$(OpenDevelopHostBin)' == '' And '$(OPENDEVELOP_APP_PATH)' != ''">$([System.IO.Path]::GetDirectoryName('$(OPENDEVELOP_APP_PATH)'))/</OpenDevelopHostBin>
+    <OpenDevelopDebugDevFlowPort Condition="'$(OpenDevelopDebugDevFlowPort)' == '' And '$(OPENDEVELOP_ADDIN_TEST_DEVFLOW_PORT)' != ''">$(OPENDEVELOP_ADDIN_TEST_DEVFLOW_PORT)</OpenDevelopDebugDevFlowPort>
+    <OpenDevelopDebugDevFlowPort Condition="'$(OpenDevelopDebugDevFlowPort)' == '' And '$(OD_TEST_MODE)' == '1'">9303</OpenDevelopDebugDevFlowPort>
+
+    <Nullable>annotations</Nullable>
+    <OpenDevelopAddin>true</OpenDevelopAddin>
+    <OpenDevelopAddinKind>InProcess</OpenDevelopAddinKind>
+    <TargetFramework>net11.0-windows</TargetFramework>
+    <!-- The published LibreWPF closure ships lib/net10.0 only; LibreWPF.Sdk derives these folders from the TargetFramework, so pin them back. -->
+    <_ProGpuWpfManagedTransportRuntimeTfm>net10.0</_ProGpuWpfManagedTransportRuntimeTfm>
+    <_ProGpuWpfCanonicalWinFormsRuntimeTfm>net10.0</_ProGpuWpfCanonicalWinFormsRuntimeTfm>
+    <_ProGpuWpfPortableWinFormsCompatRuntimeTfm>net10.0</_ProGpuWpfPortableWinFormsCompatRuntimeTfm>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>ICSharpCode.MewUIDesigner</AssemblyName>
+    <RootNamespace>ICSharpCode.MewUIDesigner</RootNamespace>
+    <OutputPath>$(OpenDevelopRoot)AddIns/DisplayBindings/MewUIDesigner/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <Target Name="ValidateOpenDevelopRoot" BeforeTargets="ResolveProjectReferences">
+    <Error Condition="!Exists('$(OpenDevelopRoot)src/SDK/OpenDevelop.Addin.Sdk/Sdk/Sdk.props')"
+           Text="Point OpenDevelopRoot (or OPENDEVELOP_ROOT) at an OpenDevelop checkout, e.g. -p:OpenDevelopRoot=/Users/lextm/wpf-tools/OpenDevelop" />
+  </Target>
+
+  <Import Project="$(OpenDevelopRoot)src/SDK/OpenDevelop.Addin.Sdk/Sdk/Sdk.props" Condition="Exists('$(OpenDevelopRoot)src/SDK/OpenDevelop.Addin.Sdk/Sdk/Sdk.props')" />
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\MewUIXaml.xshd" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="MewUIDocumentEditor.cs" />
+    <ProjectReference Include="$(OpenDevelopRoot)src/Main/Base/Project/ICSharpCode.SharpDevelop.csproj" Private="false" />
+    <ProjectReference Include="$(OpenDevelopRoot)src/Main/Core/Project/ICSharpCode.Core.csproj" Private="false" />
+    <ProjectReference Include="$(OpenDevelopRoot)src/Main/ICSharpCode.SharpDevelop.Widgets/Project/ICSharpCode.SharpDevelop.Widgets.csproj" Private="false" />
+    <ProjectReference Include="$(OpenDevelopRoot)src/Main/Designer/Designer.Remote/Designer.Remote.csproj" Private="false" />
+    <ProjectReference Include="$(OpenDevelopRoot)src/Main/Designer/Designer.Shell/Designer.Shell.csproj" Private="false" />
+    <ProjectReference Include="$(OpenDevelopRoot)src/AddIns/DisplayBindings/DesignerCanvas/ICSharpCode.DesignerCanvas.csproj" Private="false" />
+    <ProjectReference Include="$(OpenDevelopRoot)src/Main/Designer/Designer.Presentation/Designer.Presentation.csproj" Private="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../MewUIDesigner.Host/MewUIDesigner.Host.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" SkipGetTargetFrameworkProperties="true" />
+    <PackageReference Include="LeXtudio.DevFlow.Agent.Core" Version="0.3.1" />
+  </ItemGroup>
+  <ItemGroup><None Include="MewUIDesigner.addin" /></ItemGroup>
+  <Target Name="DropPrivateDesignerPresentationCopy" AfterTargets="Build">
+    <Delete Files="$(OutDir)ICSharpCode.Designer.Presentation.dll;$(OutDir)ICSharpCode.Designer.Presentation.pdb" />
+  </Target>
+  <Import Project="$(OpenDevelopRoot)src/SDK/OpenDevelop.Addin.Sdk/Sdk/Sdk.targets" Condition="Exists('$(OpenDevelopRoot)src/SDK/OpenDevelop.Addin.Sdk/Sdk/Sdk.targets')" />
+</Project>

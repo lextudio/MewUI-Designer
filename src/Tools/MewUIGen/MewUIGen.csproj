@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OpenDevelopRoot Condition="'$(OpenDevelopRoot)' == '' And '$(OPENDEVELOP_ROOT)' != ''">$([MSBuild]::EnsureTrailingSlash('$(OPENDEVELOP_ROOT)'))</OpenDevelopRoot>
+    <OpenDevelopRoot Condition="'$(OpenDevelopRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../../OpenDevelop/'))</OpenDevelopRoot>
+    <OpenDevelopRoot>$([MSBuild]::EnsureTrailingSlash('$(OpenDevelopRoot)'))</OpenDevelopRoot>
+
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Libraries/MewUI.Xaml/LeXtudio.MewUI.Xaml.csproj" />
+  </ItemGroup>
+</Project>

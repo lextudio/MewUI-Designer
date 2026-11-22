@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OpenDevelopRoot Condition="'$(OpenDevelopRoot)' == '' And '$(OPENDEVELOP_ROOT)' != ''">$([MSBuild]::EnsureTrailingSlash('$(OPENDEVELOP_ROOT)'))</OpenDevelopRoot>
+    <OpenDevelopRoot Condition="'$(OpenDevelopRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../../../OpenDevelop/'))</OpenDevelopRoot>
+    <OpenDevelopRoot>$([MSBuild]::EnsureTrailingSlash('$(OpenDevelopRoot)'))</OpenDevelopRoot>
+
+    <TargetFramework>net11.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OpenDevelopAddin>true</OpenDevelopAddin>
+    <OpenDevelopAddinKind>OutOfProcessHost</OpenDevelopAddinKind>
+    <OutputPath>$(OpenDevelopRoot)AddIns/DisplayBindings/MewUIDesigner/Host/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(OpenDevelopRoot)src/Main/Designer/Designer.Remote/Designer.Remote.csproj" />
+    <ProjectReference Include="$(OpenDevelopRoot)src/Main/Designer/Designer.Server/Designer.Server.csproj" />
+    <ProjectReference Include="../../Libraries/MewUI.Xaml/LeXtudio.MewUI.Xaml.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) Or $([MSBuild]::IsOSPlatform('Windows'))">
+    <DefineConstants>$(DefineConstants);MEWUI_RENDER</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <PackageReference Include="Aprillz.MewUI.MacOS" Version="0.22.0" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PackageReference Include="Aprillz.MewUI.Windows" Version="0.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="3.1.12" />
+  </ItemGroup>
+</Project>
