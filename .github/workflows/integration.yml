@@ -152,7 +152,9 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb libx11-6 libice6 libsm6 libfontconfig1 libgdiplus
+          sudo apt-get install -y xvfb libx11-6 libx11-xcb1 libxkbcommon0 libgl1 libice6 libsm6 libfontconfig1 libgdiplus
+          curl -sSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+          bash /tmp/dotnet-install.sh --channel 10.0 --runtime dotnet --install-dir "$HOME/.dotnet"
 
       - name: Download stable OpenDevelop
         shell: bash
@@ -220,6 +222,8 @@ jobs:
           export OROOT="${{ github.workspace }}/OpenDevelop"
           cd "$MROOT/src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests"
           if [[ "${{ runner.os }}" == "Linux" ]]; then
+            export DOTNET_ROOT="$HOME/.dotnet"
+            export PATH="$DOTNET_ROOT:$PATH"
             xvfb-run --auto-servernum dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OROOT/" -- \
               -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
           else
