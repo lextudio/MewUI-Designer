@@ -9,7 +9,16 @@ sealed class MewUIDesignerHostClient : RecoverableDesignerDocumentHostClient, ID
 	public string PoolKey => "mewui"; public int RecoveryCount { get; private set; } public static int ActiveLeaseCount { get { lock (clientsGate) return clients.Count; } } public event EventHandler<DesignerSessionState>? Recovered; public event EventHandler<Exception>? RecoveryFailed;
 	MewUIDesignerHostClient(Connection connection) : base(connection) { this.connection = connection; connection.HostExited += OnHostExited; lock (clientsGate) clients.Add(this); }
 	public static async Task<MewUIDesignerHostClient> CreateAsync(CancellationToken token = default) => new(await broker.AcquireAsync(token).ConfigureAwait(false));
-	static async Task<Connection> StartConnectionAsync(CancellationToken token) { var path = Path.Combine(Path.GetDirectoryName(typeof(MewUIDesignerHostClient).Assembly.Location)!, "Host", "MewUIDesigner.Host.dll"); var connection = new Connection(path); await connection.StartConnectionAsync(token).ConfigureAwait(false); return connection; }
+	static async Task<Connection> StartConnectionAsync(CancellationToken token) { var path = LocateHostDll(); var connection = new Connection(path); await connection.StartConnectionAsync(token).ConfigureAwait(false); return connection; }
+	// A published add-in carries one host per OS/RID under Host/<rid>/, so a single AnyCPU add-in
+	// package serves every supported platform. A host deployed beside the add-in (Host/) is still
+	// accepted for a local build and older packages.
+	static string LocateHostDll() {
+		var baseDir = Path.GetDirectoryName(typeof(MewUIDesignerHostClient).Assembly.Location)!;
+		var rid = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
+		var perRid = Path.Combine(baseDir, "Host", rid, "MewUIDesigner.Host.dll");
+		return File.Exists(perRid) ? perRid : Path.Combine(baseDir, "Host", "MewUIDesigner.Host.dll");
+	}
 	public Task<DesignerSessionState> OpenAsync(DesignerDocumentSnapshot s, CancellationToken t = default, DesignerViewport? viewport = null) => OpenRecoverableAsync(s, t, viewport);
 	public Task<DesignerSessionState> UpdateAsync(DesignerDocumentSnapshot s, CancellationToken t = default, DesignerViewport? viewport = null) => UpdateRecoverableAsync(s, t, viewport);
 	public Task<DesignerEditSet> FlushAsync(long v, CancellationToken t = default) => Document.FlushAsync(v, t);
