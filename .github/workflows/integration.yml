@@ -145,6 +145,14 @@ jobs:
           fi
           echo "OPENDEVELOP_APP_PATH=$app" >> "$GITHUB_ENV"
 
+      - name: Prepare the Windows desktop (OOBE, foreground)
+        if: runner.os == 'Windows'
+        # The hosted Windows images open first-logon/privacy UI and, on ARM64, a WSL update prompt
+        # that steals the foreground; the synthetic-pointer journeys need OpenDevelop foregrounded.
+        continue-on-error: true
+        shell: pwsh
+        run: ./OpenDevelop/.github/ci/prepare-windows-desktop.ps1
+
       - name: Build integration tests
         shell: bash
         run: |
