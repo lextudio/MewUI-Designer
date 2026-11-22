@@ -155,6 +155,7 @@ public sealed class MewUIDesignerTests : IAsyncLifetime, IAsyncDisposable
 	[Fact]
 	public async Task MewUIDesigner_SourceBackedEditUndoRedoAndSave()
 	{
+		Assert.SkipUnless(OperatingSystem.IsMacOS() || OperatingSystem.IsWindows(), "The MewUI host only wires up the macOS and Windows render backends so far.");
 		var openedProject = await app.ReopenSolutionAsync(projectPath);
 		Assert.True(openedProject.GetProperty("success").GetBoolean(), openedProject.ToString());
 		var opened = await app.InvokeAsync("od.open-file", designerPath);
@@ -479,6 +480,7 @@ public sealed class MewUIDesignerTests : IAsyncLifetime, IAsyncDisposable
 	[Fact]
 	public async Task MewUIDesigner_DragToolboxItemOntoPreviewSurface_InsertsAndPersistsControl()
 	{
+		Assert.SkipUnless(OperatingSystem.IsMacOS() || OperatingSystem.IsWindows(), "The MewUI host only wires up the macOS and Windows render backends so far.");
 		// Companion to WPF's/WinUI's/GTK's DragToolboxItem_On*_InsertsAndPersistsControl tests
 		// (AddInTests.cs, GtkDesignerTests.cs): drives a REAL synthetic mouse drag from the
 		// shared Tools pad onto the MewUI preview surface, exercising the DragDrop.DoDragDrop

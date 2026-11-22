@@ -69,6 +69,13 @@ static class MewUIRenderer
 	/// name, so a MewUI upgrade that moves one names it in a diagnostic instead of failing blind.</summary>
 	static MethodInfo? EnsureDevice(List<string> diagnostics)
 	{
+		// The host is one AnyCPU build with every backend referenced, but only macOS and Windows
+		// wire up a render backend. On Linux the preview stays model-only: return before touching
+		// a native backend, whose absent Metal/GPU surface aborts the process instead of throwing.
+		if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS()) {
+			diagnostics.Add("MewUI rendering is available on macOS and Windows only; the preview is model-only here.");
+			return null;
+		}
 		// GDI on Windows: a software backend, so an offscreen frame needs no GPU device or window.
 		var (backendDll, backendType) = OperatingSystem.IsWindows()
 			? ("Aprillz.MewUI.Backend.Gdi.dll", "GdiGraphicsFactory")
