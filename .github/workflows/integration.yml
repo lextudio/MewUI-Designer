@@ -136,7 +136,10 @@ jobs:
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             app="${{ runner.temp }}/od/OpenDevelop.app/Contents/MacOS/OpenDevelop"
           elif [[ "${{ runner.os }}" == "Windows" ]]; then
-            app=$(find "${{ runner.temp }}/od" -name "OpenDevelop.exe" | head -1)
+            # One unified payload ships both launchers: OpenDevelop.exe is x64, OpenDevelopARM64.exe is ARM64.
+            launcher="OpenDevelop.exe"
+            [[ "${{ matrix.name }}" == "windows-arm64" ]] && launcher="OpenDevelopARM64.exe"
+            app=$(find "${{ runner.temp }}/od" -name "$launcher" | head -1)
           else
             app=$(find "${{ runner.temp }}/od/linux" -maxdepth 3 -type f -name "OpenDevelop" -perm -u+x | head -1)
           fi
