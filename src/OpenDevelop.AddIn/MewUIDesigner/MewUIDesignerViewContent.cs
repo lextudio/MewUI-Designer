@@ -285,7 +285,7 @@ public sealed class MewUIDesignerViewContent : AbstractViewContentHandlingLoadEr
 	}
 	bool RenameSelected(string newName) { if (selected == null || host == null || selected.Id == "$window") return false; var oldId = selected.Id; return Mutate(() => host.RenameAsync(state.Version, oldId, newName).GetAwaiter().GetResult()) && SelectByName(newName); }
 	void RequestRename() { if (selected == null || selected.Id == "$window") return; var newName = MessageService.ShowInputBox("Rename", "Enter a new element name:", selected.Name ?? selected.Id)?.Trim(); if (!string.IsNullOrEmpty(newName) && !string.Equals(newName, selected.Id, StringComparison.Ordinal) && !RenameSelected(newName)) MessageService.ShowError(state.Error); }
-	public void RefreshDesign() { if (host == null) return; var text = host.FlushAsync(state.Version).GetAwaiter().GetResult().Files[0].Text; state = host.UpdateAsync(Snapshot(text, state.Version + 1)).GetAwaiter().GetResult(); loadedMxamlText = text; Rebuild(); }
+	public void RefreshDesign() { if (host == null) return; var flushed = host.FlushAsync(state.Version).GetAwaiter().GetResult(); var text = flushed.Files[0].Text; state = host.UpdateAsync(Snapshot(text, Math.Max(state.Version, flushed.BaseVersion) + 1)).GetAwaiter().GetResult(); loadedMxamlText = text; Rebuild(); }
 	public void RestartDesignHost() { if (host == null) return; state = host.RestartPoolAsync().GetAwaiter().GetResult(); loadedMxamlText = host.FlushAsync(state.Version).GetAwaiter().GetResult().Files[0].Text; Rebuild(); }
 	public void TerminateDesignHost() { if (host == null) return; state = host.TerminateAndRecoverAsync().GetAwaiter().GetResult(); Rebuild(); }
 	bool Mutate(Func<DesignerSessionState> action)
@@ -305,7 +305,12 @@ public sealed class MewUIDesignerViewContent : AbstractViewContentHandlingLoadEr
 	{
 		var baseVersion = state.Version;
 		var result = await action().ConfigureAwait(true);
-		if (state.Version != baseVersion) { commands.Invalidate(); return false; }
+		if (state.Version != baseVersion) {
+			// The local state moved while the host call was in flight. The host is authoritative: if it applied the
+			// edit and is now ahead of the view, adopt its state. Discarding it would leave the view on an old version
+			// and make every later versioned call (including Save) fail as stale. Never go backwards.
+			if (!(result.Accepted && result.Version > state.Version)) { commands.Invalidate(); return false; }
+		}
 		if (!result.Accepted && state.Accepted && result.Version == state.Version) { diagnostic.Text = result.Error; commands.Invalidate(); return false; }
 		state = result;
 		if (state.Accepted) mxamlFile.MakeDirty();
