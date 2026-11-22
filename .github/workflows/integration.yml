@@ -178,5 +178,3 @@ jobs:
             --source https://nuget.pkg.github.com/lextudio/index.json
           dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true -- \
             -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
-EOF
-ruby -ryaml -e "YAML.load_file('/Users/lextm/wpf-tools/MewUI-Designer/.github/workflows/integration.yml'); puts 'yaml ok'"
