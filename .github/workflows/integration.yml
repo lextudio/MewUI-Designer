@@ -55,27 +55,17 @@ jobs:
           export MROOT="${{ github.workspace }}/MewUI-Designer"
           export OROOT="${{ github.workspace }}/OpenDevelop"
           export OPENDEVELOP_ROOT="$OROOT/"
+          CFG="$MROOT/.github/ci/NuGet.Config"
           cd "$MROOT"
-          dotnet restore src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj \
-            --source https://api.nuget.org/v3/index.json \
-            --source https://nuget.pkg.github.com/lextudio/index.json
-          dotnet build src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
-          dotnet restore src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj \
-            --source https://api.nuget.org/v3/index.json \
-            --source https://nuget.pkg.github.com/lextudio/index.json
-          dotnet build src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
-          dotnet restore src/Tools/MewUIGen/MewUIGen.csproj \
-            --source https://api.nuget.org/v3/index.json \
-            --source https://nuget.pkg.github.com/lextudio/index.json
-          dotnet build src/Tools/MewUIGen/MewUIGen.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
-          dotnet restore tests/fixtures/MewUIFixture/MewUIFixture.csproj \
-            --source https://api.nuget.org/v3/index.json \
-            --source https://nuget.pkg.github.com/lextudio/index.json
-          dotnet build tests/fixtures/MewUIFixture/MewUIFixture.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
-          dotnet restore src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj \
-            --source https://api.nuget.org/v3/index.json \
-            --source https://nuget.pkg.github.com/lextudio/index.json
-          dotnet build src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+          for proj in \
+            src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj \
+            src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj \
+            src/Tools/MewUIGen/MewUIGen.csproj \
+            tests/fixtures/MewUIFixture/MewUIFixture.csproj \
+            src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj ; do
+            dotnet restore "$proj" --configfile "$CFG"
+            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT"
+          done
 
   integration:
     name: DevFlow integration (${{ matrix.os }})
@@ -135,16 +125,16 @@ jobs:
           export MROOT="${{ github.workspace }}/MewUI-Designer"
           export OROOT="${{ github.workspace }}/OpenDevelop"
           export OPENDEVELOP_ROOT="$OROOT/"
+          CFG="$MROOT/.github/ci/NuGet.Config"
           cd "$MROOT"
           for proj in \
             src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj \
             src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj \
             src/Tools/MewUIGen/MewUIGen.csproj \
-            tests/fixtures/MewUIFixture/MewUIFixture.csproj ; do
-            dotnet restore "$proj" \
-              --source https://api.nuget.org/v3/index.json \
-              --source https://nuget.pkg.github.com/lextudio/index.json
-            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
+            tests/fixtures/MewUIFixture/MewUIFixture.csproj \
+            src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj ; do
+            dotnet restore "$proj" --configfile "$CFG"
+            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT"
           done
 
       - name: Install add-in into stable OpenDevelop
@@ -173,8 +163,5 @@ jobs:
           export OROOT="${{ github.workspace }}/OpenDevelop"
           export OPENDEVELOP_ROOT="$OROOT/"
           cd "$MROOT/src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests"
-          dotnet restore MewUIDesigner.IntegrationTests.csproj \
-            --source https://api.nuget.org/v3/index.json \
-            --source https://nuget.pkg.github.com/lextudio/index.json
-          dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true -- \
+          dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -- \
             -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
