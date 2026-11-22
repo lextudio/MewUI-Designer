@@ -42,3 +42,19 @@ OPENDEVELOP_APP_PATH=/path/to/OpenDevelop \
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## CI stability notes
+
+The integration workflow targets the latest stable OpenDevelop release and runs the
+same add-in package on Windows x64/ARM64, Linux x64/ARM64 and macOS ARM64.
+
+- The add-in and its host are AnyCPU. The host references every MewUI platform backend, and
+  `MewUIRenderer` selects one at run time; Linux therefore stays model-only (the render-bound
+  journeys skip there).
+- Linux installs OpenDevelop's own `install-linux-prerequisites.sh` (Xvfb, Vulkan loader and
+  Mesa lavapipe), because the hosted runners have no GPU and wgpu aborts without a software
+  Vulkan driver.
+- Windows runs OpenDevelop's `prepare-windows-desktop.ps1` so first-logon/privacy UI and the
+  ARM64 WSL update prompt cannot steal the foreground from synthetic pointer input.
+- A transient cold-host failure in a DevFlow action is returned as a failure instead of reaching
+  the UI dispatcher (which would close the IDE); the list-edit journey retries the host call.
