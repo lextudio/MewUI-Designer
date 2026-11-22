@@ -28,12 +28,18 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   build:
-    name: Build add-in (${{ matrix.os }})
+    name: Build add-in (${{ matrix.name }})
     needs: resolve-version
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - { name: windows-x64,   os: windows-latest,   asset: OpenDevelop-win.7z }
+          - { name: windows-arm64, os: windows-11-arm,   asset: OpenDevelop-win.7z }
+          - { name: linux-x64,     os: ubuntu-latest,    asset: OpenDevelop-linux-x64.tar.xz }
+          - { name: linux-arm64,   os: ubuntu-24.04-arm, asset: OpenDevelop-linux-arm64.tar.xz }
+          - { name: macos-arm64,   os: macos-latest,     asset: OpenDevelop-macos.dmg }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,16 +70,22 @@ jobs:
             tests/fixtures/MewUIFixture/MewUIFixture.csproj \
             src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj ; do
             dotnet restore "$proj" --configfile "$CFG"
-            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT"
+            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:EnableWindowsTargeting=true
           done
 
   integration:
-    name: DevFlow integration (${{ matrix.os }})
+    name: DevFlow integration (${{ matrix.name }})
     needs: [resolve-version, build]
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - { name: windows-x64,   os: windows-latest,   asset: OpenDevelop-win.7z }
+          - { name: windows-arm64, os: windows-11-arm,   asset: OpenDevelop-win.7z }
+          - { name: linux-x64,     os: ubuntu-latest,    asset: OpenDevelop-linux-x64.tar.xz }
+          - { name: linux-arm64,   os: ubuntu-24.04-arm, asset: OpenDevelop-linux-arm64.tar.xz }
+          - { name: macos-arm64,   os: macos-latest,     asset: OpenDevelop-macos.dmg }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,34 +101,46 @@ jobs:
         with:
           dotnet-version: '11.0.x'
 
+      - name: Install Linux display dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libx11-6 libice6 libsm6 libfontconfig1 libgdiplus
+
       - name: Download stable OpenDevelop
         shell: bash
         env:
           TAG: ${{ needs.resolve-version.outputs.tag }}
+          ASSET: ${{ matrix.asset }}
         run: |
           set -e
           mkdir -p "${{ runner.temp }}/od"
+          curl -fL -o "${{ runner.temp }}/od/pkg" \
+            "https://github.com/lextudio/OpenDevelop/releases/download/${TAG}/${ASSET}"
           if [[ "${{ runner.os }}" == "macOS" ]]; then
-            curl -fL -o "${{ runner.temp }}/od/OpenDevelop.dmg" \
-              "https://github.com/lextudio/OpenDevelop/releases/download/${TAG}/OpenDevelop-macos.dmg"
-            hdiutil attach "${{ runner.temp }}/od/OpenDevelop.dmg" -nobrowse -mountpoint "${{ runner.temp }}/od/mnt"
+            hdiutil attach "${{ runner.temp }}/od/pkg" -nobrowse -mountpoint "${{ runner.temp }}/od/mnt"
             cp -R "${{ runner.temp }}/od/mnt/OpenDevelop.app" "${{ runner.temp }}/od/OpenDevelop.app"
             hdiutil detach "${{ runner.temp }}/od/mnt"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            7z x "${{ runner.temp }}/od/pkg" -o"${{ runner.temp }}/od" -y
           else
-            curl -fL -o "${{ runner.temp }}/od/OpenDevelop.7z" \
-              "https://github.com/lextudio/OpenDevelop/releases/download/${TAG}/OpenDevelop-win.7z"
-            7z x "${{ runner.temp }}/od/OpenDevelop.7z" -o"${{ runner.temp }}/od" -y
+            mkdir -p "${{ runner.temp }}/od/linux"
+            tar -xJf "${{ runner.temp }}/od/pkg" -C "${{ runner.temp }}/od/linux"
           fi
 
       - name: Set OpenDevelop app path
         shell: bash
         run: |
+          set -e
           if [[ "${{ runner.os }}" == "macOS" ]]; then
-            echo "OPENDEVELOP_APP_PATH=${{ runner.temp }}/od/OpenDevelop.app/Contents/MacOS/OpenDevelop" >> "$GITHUB_ENV"
+            app="${{ runner.temp }}/od/OpenDevelop.app/Contents/MacOS/OpenDevelop"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            app=$(find "${{ runner.temp }}/od" -name "OpenDevelop.exe" | head -1)
           else
-            exe=$(find "${{ runner.temp }}/od" -name "OpenDevelop.exe" | head -1)
-            echo "OPENDEVELOP_APP_PATH=$exe" >> "$GITHUB_ENV"
+            app=$(find "${{ runner.temp }}/od/linux" -maxdepth 3 -type f -name "OpenDevelop" -perm -u+x | head -1)
           fi
+          echo "OPENDEVELOP_APP_PATH=$app" >> "$GITHUB_ENV"
 
       - name: Build add-in
         shell: bash
@@ -134,14 +158,13 @@ jobs:
             tests/fixtures/MewUIFixture/MewUIFixture.csproj \
             src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests/MewUIDesigner.IntegrationTests.csproj ; do
             dotnet restore "$proj" --configfile "$CFG"
-            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT"
+            dotnet build "$proj" -c Debug --no-restore -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:EnableWindowsTargeting=true
           done
 
       - name: Install add-in into stable OpenDevelop
         shell: bash
         run: |
           set -e
-          export MROOT="${{ github.workspace }}/MewUI-Designer"
           export OROOT="${{ github.workspace }}/OpenDevelop"
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             ADDINS="${{ runner.temp }}/od/OpenDevelop.app/Contents/MacOS/AddIns"
@@ -163,5 +186,10 @@ jobs:
           export OROOT="${{ github.workspace }}/OpenDevelop"
           export OPENDEVELOP_ROOT="$OROOT/"
           cd "$MROOT/src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests"
-          dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -- \
-            -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            xvfb-run --auto-servernum dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -- \
+              -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
+          else
+            dotnet run -c Debug --no-build -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -- \
+              -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
+          fi
