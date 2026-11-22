@@ -59,95 +59,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mewui-addin
-          path: |
-            OpenDevelop/AddIns/DisplayBindings/MewUIDesigner/**
-            !OpenDevelop/AddIns/DisplayBindings/MewUIDesigner/Host/**
-          if-no-files-found: error
-
-  build-host:
-    name: Build host (${{ matrix.name }})
-    needs: resolve-version
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { name: windows-x64,   os: windows-latest,   rid: win-x64 }
-          - { name: windows-arm64, os: windows-11-arm,   rid: win-arm64 }
-          - { name: linux-x64,     os: ubuntu-latest,    rid: linux-x64 }
-          - { name: linux-arm64,   os: ubuntu-24.04-arm, rid: linux-arm64 }
-          - { name: macos-arm64,   os: macos-latest,     rid: osx-arm64 }
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: MewUI-Designer
-          fetch-depth: 0
-      - uses: actions/checkout@v4
-        with:
-          repository: lextudio/OpenDevelop
-          ref: ${{ needs.resolve-version.outputs.tag }}
-          path: OpenDevelop
-          fetch-depth: 0
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '11.0.x'
-      - name: Build
-        shell: bash
-        run: |
-          set -e
-          export MROOT="${{ github.workspace }}/MewUI-Designer"
-          export OROOT="${{ github.workspace }}/OpenDevelop"
-          CFG="$MROOT/.github/ci/NuGet.Config"
-          cd "$MROOT"
-          dotnet restore src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj --configfile "$CFG"
-          dotnet build src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj -c Debug --no-restore -p:OpenDevelopRoot="$OROOT/" -p:EnableWindowsTargeting=true
-      - name: Upload host
-        uses: actions/upload-artifact@v4
-        with:
-          name: mewui-host-${{ matrix.name }}
-          path: OpenDevelop/AddIns/DisplayBindings/MewUIDesigner/Host/**
-          if-no-files-found: error
-
-  package:
-    name: Assemble one plugin package
-    needs: [build-addin, build-host]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download add-in
-        uses: actions/download-artifact@v4
-        with:
-          name: mewui-addin
-          path: plugin
-      - name: Download hosts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: mewui-host-*
-          path: hosts
-      - name: Assemble
-        shell: bash
-        run: |
-          set -e
-          mkdir -p plugin/Host
-          for dir in hosts/mewui-host-*; do
-            name=$(basename "$dir")
-            rid=${name#mewui-host-}
-            rid=${rid/windows-x64/win-x64}
-            rid=${rid/windows-arm64/win-arm64}
-            rid=${rid/macos-arm64/osx-arm64}
-            mkdir -p "plugin/Host/$rid"
-            cp -R "$dir/"* "plugin/Host/$rid/"
-          done
-          find plugin -maxdepth 3 -type d | sort
-      - name: Upload plugin
-        uses: actions/upload-artifact@v4
-        with:
-          name: mewui-plugin
-          path: plugin/**
+          path: OpenDevelop/AddIns/DisplayBindings/MewUIDesigner/**
           if-no-files-found: error
 
   integration:
     name: DevFlow integration (${{ matrix.name }})
-    needs: [resolve-version, package]
+    needs: [resolve-version, build-addin]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -176,7 +93,7 @@ jobs:
       - name: Download plugin
         uses: actions/download-artifact@v4
         with:
-          name: mewui-plugin
+          name: mewui-addin
           path: ${{ runner.temp }}/addin
 
       - name: Install Linux display dependencies

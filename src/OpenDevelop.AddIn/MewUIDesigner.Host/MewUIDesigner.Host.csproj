@@ -20,13 +20,14 @@
     <ProjectReference Include="../../Libraries/MewUI.Xaml/LeXtudio.MewUI.Xaml.csproj" />
   </ItemGroup>
 
-  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) Or $([MSBuild]::IsOSPlatform('Windows'))">
+  <!-- The renderer is managed AnyCPU: reference every platform backend so one host build
+       works on macOS and Windows. The runtime picks the backend by OperatingSystem (see
+       MewUIRenderer.EnsureDevice); Linux stays model-only with a diagnostic frame. -->
+  <PropertyGroup>
     <DefineConstants>$(DefineConstants);MEWUI_RENDER</DefineConstants>
   </PropertyGroup>
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+  <ItemGroup>
     <PackageReference Include="Aprillz.MewUI.MacOS" Version="0.22.0" />
-  </ItemGroup>
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <PackageReference Include="Aprillz.MewUI.Windows" Version="0.22.0" />
   </ItemGroup>
 
