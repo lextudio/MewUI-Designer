@@ -73,7 +73,7 @@ jobs:
           - { name: windows-x64,   os: windows-latest,   asset: OpenDevelop-win.7z }
           - { name: windows-arm64, os: windows-11-arm,   asset: OpenDevelop-win.7z }
           - { name: linux-x64,     os: ubuntu-latest,    asset: OpenDevelop-linux-x64.tar.xz }
-          - { name: linux-arm64,   os: ubuntu-24.04-arm, asset: OpenDevelop-linux-arm64.tar.xz }
+          - { name: linux-arm64,   os: ubuntu-26.04-arm, asset: OpenDevelop-linux-arm64.tar.xz }
           - { name: macos-arm64,   os: macos-latest,     asset: OpenDevelop-macos.dmg }
     steps:
       - uses: actions/checkout@v4
@@ -103,8 +103,10 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libx11-6 libx11-xcb1 libxkbcommon0 libgl1 libice6 libsm6 libfontconfig1 libgdiplus
+          # Reuse OpenDevelop's own definition of the Linux environment (Xvfb plus the Vulkan loader and
+          # Mesa's lavapipe software driver: the hosted runners have no GPU, and without it wgpu has no
+          # instance and the IDE aborts with SIGABRT/134 at startup).
+          bash "${{ github.workspace }}/OpenDevelop/.github/ci/install-linux-prerequisites.sh" --display
 
       - name: Download stable OpenDevelop
         shell: bash
