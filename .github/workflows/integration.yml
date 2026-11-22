@@ -38,11 +38,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: MewUI-Designer
+          fetch-depth: 0
       - uses: actions/checkout@v4
         with:
           repository: lextudio/OpenDevelop
           ref: ${{ needs.resolve-version.outputs.tag }}
           path: OpenDevelop
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '11.0.x'
@@ -54,6 +56,7 @@ jobs:
           export OROOT="${{ github.workspace }}/OpenDevelop"
           export OPENDEVELOP_ROOT="$OROOT/"
           cd "$MROOT"
+          ln -s "$OROOT" "$MROOT/OpenDevelop" 2>/dev/null || true
           dotnet build src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
           dotnet build src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
           dotnet build src/Tools/MewUIGen/MewUIGen.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
@@ -71,11 +74,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: MewUI-Designer
+          fetch-depth: 0
       - uses: actions/checkout@v4
         with:
           repository: lextudio/OpenDevelop
           ref: ${{ needs.resolve-version.outputs.tag }}
           path: OpenDevelop
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '11.0.x'
@@ -117,6 +122,7 @@ jobs:
           export OROOT="${{ github.workspace }}/OpenDevelop"
           export OPENDEVELOP_ROOT="$OROOT/"
           cd "$MROOT"
+          ln -s "$OROOT" "$MROOT/OpenDevelop" 2>/dev/null || true
           dotnet build src/OpenDevelop.AddIn/MewUIDesigner/MewUIDesigner.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
           dotnet build src/OpenDevelop.AddIn/MewUIDesigner.Host/MewUIDesigner.Host.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
           dotnet build src/Tools/MewUIGen/MewUIGen.csproj -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true
@@ -147,6 +153,7 @@ jobs:
           export MROOT="${{ github.workspace }}/MewUI-Designer"
           export OROOT="${{ github.workspace }}/OpenDevelop"
           export OPENDEVELOP_ROOT="$OROOT/"
+          ln -s "$OROOT" "$MROOT/OpenDevelop" 2>/dev/null || true
           cd "$MROOT/src/OpenDevelop.AddIn/MewUIDesigner.IntegrationTests"
           dotnet run -c Debug -p:OpenDevelopRoot="$OPENDEVELOP_ROOT" -p:RestoreIgnoreFailedSources=true -- \
             -class OpenDevelop.IntegrationTests.MewUIDesignerTests -parallel none
