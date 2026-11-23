@@ -108,7 +108,18 @@ jobs:
           # instance and the IDE aborts with SIGABRT/134 at startup).
           bash "${{ github.workspace }}/OpenDevelop/.github/ci/install-linux-prerequisites.sh" --display
 
-      - name: Download stable OpenDevelop
+      # The release asset is the same for every run against one tag; a cache keeps the large download off the network
+      # (and off GitHub's release-download rate limits). The key carries the tag, so a new stable OpenDevelop misses and
+      # downloads once; bump the trailing v1 to invalidate every entry.
+      - name: Restore cached OpenDevelop
+        id: od-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/od/pkg
+          key: opendevelop-${{ needs.resolve-version.outputs.tag }}-${{ matrix.name }}-v1
+
+      - name: Download OpenDevelop on cache miss
+        if: steps.od-cache.outputs.cache-hit != 'true'
         shell: bash
         env:
           TAG: ${{ needs.resolve-version.outputs.tag }}
@@ -116,8 +127,22 @@ jobs:
         run: |
           set -e
           mkdir -p "${{ runner.temp }}/od"
-          curl -fL -o "${{ runner.temp }}/od/pkg" \
+          curl -fL --retry 3 \
+            -o "${{ runner.temp }}/od/pkg" \
             "https://github.com/lextudio/OpenDevelop/releases/download/${TAG}/${ASSET}"
+          test -s "${{ runner.temp }}/od/pkg"
+
+      - name: Save cached OpenDevelop
+        if: steps.od-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/od/pkg
+          key: ${{ steps.od-cache.outputs.cache-primary-key }}
+
+      - name: Extract OpenDevelop
+        shell: bash
+        run: |
+          set -e
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             hdiutil attach "${{ runner.temp }}/od/pkg" -nobrowse -mountpoint "${{ runner.temp }}/od/mnt"
             cp -R "${{ runner.temp }}/od/mnt/OpenDevelop.app" "${{ runner.temp }}/od/OpenDevelop.app"
